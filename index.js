@@ -3,10 +3,12 @@ import "dotenv/config";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import bodyParser from "body-parser";
-import { client } from "./Database/db.config.js";
-import jwt from "jsonwebtoken";
-import { ObjectId } from "mongodb";
 
+// 
+import get from "./API/get.js"
+import post from "./API/post.js"
+import put from "./API/put.js"
+import Delete from "./API/delete.js"
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,7 +21,7 @@ const cookieOptions = {
 
 app.use(
   cors({
-    origin: ["http://localhost:5173",],
+    origin: ["http://localhost:5173", "http://localhost:5174"],
     credentials: true,
   })
 );
@@ -33,6 +35,11 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.get("/", (req, res) => {
   res.send("🚀 Working fine!");
 });
+
+app.use(get)
+app.use(post)
+app.use(put)
+app.use(Delete)
 
 app.listen(PORT, () => {
   console.log(`🚀 App is Running on ${PORT}`);
