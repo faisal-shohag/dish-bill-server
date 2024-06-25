@@ -226,6 +226,125 @@ router.get("/users-with-search", async (req, res) => {
   }
 });
 
+//payments state
+router.get("/payments-statistics", async (req, res) => {
+  try {
+    // Current date and the first day of the current month
+    const currentDate = new Date();
+    const firstDayOfCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+
+    // Total paid payments
+    const totalPaidPaymentsResult = await prisma.payments.aggregate({
+      _sum: { amount: true },
+      where: { status: 'paid' }
+    });
+    const totalPaidPayments = totalPaidPaymentsResult._sum.amount || 0;
+
+    // Total pending payments
+    const totalPendingPaymentsResult = await prisma.payments.aggregate({
+      _sum: { amount: true },
+      where: { status: 'pending' }
+    });
+    const totalPendingPayments = totalPendingPaymentsResult._sum.amount || 0;
+
+    // Total pending payments this month
+    const totalPendingThisMonthResult = await prisma.payments.aggregate({
+      _sum: { amount: true },
+      where: {
+        status: 'pending',
+        date: { gte: firstDayOfCurrentMonth }
+      }
+    });
+    const totalPendingThisMonth = totalPendingThisMonthResult._sum.amount || 0;
+
+    // Total paid payments this month
+    const totalPaidThisMonthResult = await prisma.payments.aggregate({
+      _sum: { amount: true },
+      where: {
+        status: 'paid',
+        date: { gte: firstDayOfCurrentMonth }
+      }
+    });
+    const totalPaidThisMonth = totalPaidThisMonthResult._sum.amount || 0;
+
+    res.status(200).json({
+      success: true,
+      totalPaidPayments,
+      totalPendingPayments,
+      totalPendingThisMonth,
+      totalPaidThisMonth
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({ success: false, message: "Error fetching payments summary" });
+  }
+});
+
+//payment report
+router.get("/payments-report", async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    console.log(startDate, endDate);
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ success: false, message: "startDate and endDate are required" });
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    // Fetch total paid payments between the specified dates
+    const totalPaidResult = await prisma.payments.aggregate({
+      _sum: { amount: true },
+      where: {
+        status: 'paid',
+        date: {
+          gte: start,
+          lte: end
+        }
+      }
+    });
+    const totalPaid = totalPaidResult._sum.amount || 0;
+
+    // Fetch total pending payments between the specified dates
+    const totalPendingResult = await prisma.payments.aggregate({
+      _sum: { amount: true },
+      where: {
+        status: 'pending',
+        date: {
+          gte: start,
+          lte: end
+        }
+      }
+    });
+    const totalPending = totalPendingResult._sum.amount || 0;
+
+    // Fetch all payments between the specified dates
+    const payments = await prisma.payments.findMany({
+      where: {
+        date: {
+          gte: start,
+          lte: end
+        },
+        status: { in: ['pending', 'paid'] }
+      },
+      orderBy: {
+        date: "asc"
+      },
+      include: { user: true }
+    });
+
+    res.status(200).json({
+      success: true,
+      totalPaid,
+      totalPending,
+      payments
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Error fetching payments report" });
+  }
+});
 
 
 
