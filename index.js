@@ -21,7 +21,7 @@ const cookieOptions = {
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:5174", "https://dish-bill.netlify.app"],
+    origin: ["http://localhost:5173", "http://localhost:5174", "https://dish-bill.netlify.app", "https://dish-bill.vercel.app"],
     credentials: true,
   })
 );
