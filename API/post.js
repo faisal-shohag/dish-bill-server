@@ -34,6 +34,10 @@ router.post('/payments', async (req, res) => {
     // Process each user
     for (const user of users) {
       // Check if payment for the given month already exists for the user
+      if(user.status === "inactive"){
+        continue;
+      }
+      
       const existingPayment = await prisma.payments.findFirst({
         where: {
           userId: user.id,
