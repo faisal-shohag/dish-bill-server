@@ -140,16 +140,20 @@ router.get('/stats', async (req, res) => {
       _sum: {
         amount: true,
       },
+      where: {
+        status: 'paid',
+      },
     });
 
     const currentDate = new Date();
     const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    
-    const monthlyIncome = await prisma.payments.aggregate({
+
+    const thisMonthIncome = await prisma.payments.aggregate({
       _sum: {
         amount: true,
       },
       where: {
+        status: 'paid',
         date: {
           gte: firstDayOfMonth,
           lt: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1),
@@ -162,10 +166,19 @@ router.get('/stats', async (req, res) => {
         amount: true,
       },
       where: {
+        status: 'paid',
         date: {
           gte: firstDayOfMonth,
         },
       },
+    });
+
+    const pendingPaymentsCount = await prisma.payments.count({
+      where: { status: 'pending' },
+    });
+
+    const notCollectedPaymentsCount = await prisma.payments.count({
+      where: { status: 'not-collected' },
     });
 
     res.json({
@@ -173,14 +186,18 @@ router.get('/stats', async (req, res) => {
       totalActiveUsers,
       totalInactiveUsers,
       totalIncome: totalIncome._sum.amount ? totalIncome._sum.amount : 0,
-      thisMonthIncome: monthlyIncome._sum.amount ? monthlyIncome._sum.amount : 0,
+      thisMonthIncome: thisMonthIncome._sum.amount ? thisMonthIncome._sum.amount : 0,
       monthlyAverageIncome: monthlyAverageIncome._avg.amount ? monthlyAverageIncome._avg.amount : 0,
+      pendingPaymentsCount,
+      notCollectedPaymentsCount,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+
 
 
 
@@ -267,12 +284,47 @@ router.get("/payments-statistics", async (req, res) => {
     });
     const totalPaidThisMonth = totalPaidThisMonthResult._sum.amount || 0;
 
+    // Total not collected payments
+    const totalNotCollectedPaymentsResult = await prisma.payments.aggregate({
+      _sum: { amount: true },
+      where: { status: 'not-collected' }
+    });
+    const totalNotCollectedPayments = totalNotCollectedPaymentsResult._sum.amount || 0;
+
+    // Total not collected payments this month
+    const totalNotCollectedThisMonthResult = await prisma.payments.aggregate({
+      _sum: { amount: true },
+      where: {
+        status: 'not-collected',
+        date: { gte: firstDayOfCurrentMonth }
+      }
+    });
+    const totalNotCollectedThisMonth = totalNotCollectedThisMonthResult._sum.amount || 0;
+
+    // Total payments count
+    const totalPaymentsCount = await prisma.payments.count();
+
+    // Pending payments count
+    const pendingPaymentsCount = await prisma.payments.count({
+      where: { status: 'pending' }
+    });
+
+    // Not collected payments count
+    const notCollectedPaymentsCount = await prisma.payments.count({
+      where: { status: 'not-collected' }
+    });
+
     res.status(200).json({
       success: true,
       totalPaidPayments,
       totalPendingPayments,
       totalPendingThisMonth,
-      totalPaidThisMonth
+      totalPaidThisMonth,
+      totalNotCollectedPayments,
+      totalNotCollectedThisMonth,
+      totalPaymentsCount,
+      pendingPaymentsCount,
+      notCollectedPaymentsCount
     });
   } catch (error) {
     console.error(error);
@@ -319,6 +371,18 @@ router.get("/payments-report", async (req, res) => {
     });
     const totalPending = totalPendingResult._sum.amount || 0;
 
+    const totalNotCollectedResult = await prisma.payments.aggregate({
+      _sum: { amount: true },
+      where: {
+        status: 'not-collected',
+        date: {
+          gte: start,
+          lte: end
+        }
+      }
+    });
+    const totalNotCollected = totalNotCollectedResult._sum.amount || 0;
+
     // Fetch all payments between the specified dates
     const payments = await prisma.payments.findMany({
       where: {
@@ -326,7 +390,7 @@ router.get("/payments-report", async (req, res) => {
           gte: start,
           lte: end
         },
-        status: { in: ['pending', 'paid'] }
+        status: { in: ['pending', 'paid', 'not-collected'] }
       },
       orderBy: {
         date: "asc"
@@ -338,6 +402,7 @@ router.get("/payments-report", async (req, res) => {
       success: true,
       totalPaid,
       totalPending,
+      totalNotCollected,
       payments
     });
   } catch (error) {
@@ -346,6 +411,57 @@ router.get("/payments-report", async (req, res) => {
   }
 });
 
+//payments search
+router.get('/payments-search', async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search="" } = req.query;
+    let s = ""
+    if(search.includes("|")){
+      s = search.split("|")[1]
+      s === "*" ? s = "" : s = s 
+    }
+
+
+     const searchConditions = search
+      ? {
+          OR: [
+            { month: { contains: search, mode: "insensitive" } },
+            { status: { contains: s, mode: "insensitive" } },
+          ],
+        }
+      : {};
+
+
+      console.log(searchConditions.OR)
+
+
+    const payments = await prisma.payments.findMany({
+      where: searchConditions,
+      skip: (page - 1) * limit,
+      take: parseInt(limit),
+      orderBy: {
+        date: 'desc', // Optional: you can change this to any field you want to order by
+      },
+      include: {
+        user: true, // Include user details if needed
+      },
+    });
+
+    const totalPayments = await prisma.payments.count({
+      where: searchConditions,
+    });
+
+    res.status(200).json({
+      success: true,
+      payments,
+      totalPages: Math.ceil(totalPayments / limit),
+      currentPage: parseInt(page),
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({ success: false, message: 'Error fetching payments' });
+  }
+});
 
 
 

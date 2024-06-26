@@ -46,7 +46,7 @@ router.post('/payments', async (req, res) => {
         const newPayment = await prisma.payments.create({
           data: {
             userId: user.id,
-            amount: 0,
+            amount: user.bill,
             month: month,
           },
         });
