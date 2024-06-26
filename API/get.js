@@ -431,10 +431,6 @@ router.get('/payments-search', async (req, res) => {
         }
       : {};
 
-
-      console.log(searchConditions.OR)
-
-
     const payments = await prisma.payments.findMany({
       where: searchConditions,
       skip: (page - 1) * limit,
