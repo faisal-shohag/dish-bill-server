@@ -415,42 +415,47 @@ router.get("/payments-report", async (req, res) => {
 router.get('/payments-search', async (req, res) => {
   try {
     const { page = 1, limit = 10, search="" } = req.query;
+    
     let s = ""
+    let month = ""
     if(search.includes("|")){
       s = search.split("|")[1]
       s === "*" ? s = "" : s = s 
+      month = search.split("|")[0]
     }
+    // console.log(search)
 
 
      const searchConditions = search
       ? {
-          OR: [
-            { month: { contains: search, mode: "insensitive" } },
+          AND: [
+            { month: { contains: month, mode: "insensitive" } },
             { status: { contains: s, mode: "insensitive" } },
           ],
         }
       : {};
 
+      // console.log(searchConditions.OR)
+
     const payments = await prisma.payments.findMany({
-      where: searchConditions,
+      where:searchConditions,
       skip: (page - 1) * limit,
       take: parseInt(limit),
-      orderBy: {
-        date: 'desc', // Optional: you can change this to any field you want to order by
-      },
       include: {
         user: true, // Include user details if needed
       },
     });
 
-    const totalPayments = await prisma.payments.count({
-      where: searchConditions,
-    });
+    // const totalPayments = await prisma.payments.count({
+    //   where: searchConditions,
+    // });
+
+    // console.log(payments)
 
     res.status(200).json({
       success: true,
       payments,
-      totalPages: Math.ceil(totalPayments / limit),
+      totalPages: Math.ceil(payments.length / limit),
       currentPage: parseInt(page),
     });
   } catch (error) {
