@@ -446,16 +446,16 @@ router.get('/payments-search', async (req, res) => {
       },
     });
 
-    // const totalPayments = await prisma.payments.count({
-    //   where: searchConditions,
-    // });
+    const totalPayments = await prisma.payments.count({
+      where: searchConditions,
+    });
 
     // console.log(payments)
 
     res.status(200).json({
       success: true,
       payments,
-      totalPages: Math.ceil(payments.length / limit),
+      totalPages: Math.ceil(totalPayments.length / limit),
       currentPage: parseInt(page),
     });
   } catch (error) {
